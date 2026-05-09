@@ -1,0 +1,6 @@
+*/__pycache__/
+*.pyc
+.venv/
+.vscode/
+.github/
+chamfer_project/data_cache/20news_embeddings_d300.npz
