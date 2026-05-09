@@ -60,15 +60,18 @@ support an automatic choice between uniform sampling and importance
 sampling. On a $162$-instance benchmark, a pilot of size $50$
 estimates $\mathrm{CV}(\gamma)$ within $30\%$ of its true value on
 $80\%$ of instances. However, threshold sweeps show that the regime
-boundary remains genuinely difficult: near the break-even region, the
-default pilot rule incurs a $15\%$ false-positive rate and a $50\%$
-false-negative rate. End-to-end, the adaptive rule nearly matches
-uniform on low-CV text-like data and reaches IS-level error on our
-ShapeNet-like setting, while a planted-outlier dataset exposes a
-different limitation: at small $n$, cost-based routing and estimation
-quality can point in different directions. These results suggest that
-a pilot-based rule is useful as a practical heuristic, but does not
-eliminate uncertainty near the sampling-regime boundary.
+boundary remains genuinely difficult: on the borderline subset, a
+representative pooled threshold near $\sqrt{\log n}$ yields a
+$15\%$ false-positive rate and a $50\%$ false-negative rate against
+the Bernstein oracle, reflecting both pilot noise and the fact that
+the deployed rule ignores $M(\gamma)$. End-to-end, on three fixed
+synthetic demonstrators, the adaptive rule nearly matches uniform on
+low-CV text-like data and reaches IS-level error on our ShapeNet-like
+setting, while a planted-outlier dataset exposes a different
+limitation: routing by estimated cost and achieving low realized error
+can point in different directions. These results suggest that a
+pilot-based rule is a useful practical heuristic, but do not support a
+sharp or fully automatic resolution of the sampling-regime boundary.
 \end{abstract}
 
 \section{Introduction}
@@ -168,21 +171,25 @@ miscalibration.
     $\mathrm{CV}(\gamma)$ within $30\%$ of its true value on
     $80\%$ of instances. At the same time, threshold sweeps show that
     borderline instances remain difficult: near the break-even region,
-    the default pilot rule incurs a $15\%$ false-positive rate and a
-    $50\%$ false-negative rate on the borderline subset.
+    a representative pooled threshold near $\sqrt{\log n}$ incurs a
+    $15\%$ false-positive rate and a $50\%$ false-negative rate on the
+    borderline subset relative to the Bernstein oracle. We interpret
+    these rates as end-to-end routing disagreement, not as pure pilot
+    estimation error, because the runtime rule intentionally ignores
+    $M(\gamma)$.
 
     \item \textbf{An adaptive estimator and an honest end-to-end
     evaluation.} We implement \textsc{Adaptive-Chamfer}, which uses a
     uniform pilot to choose between uniform sampling and importance
-    sampling. On low-CV text-like data, the rule correctly collapses to
-    the uniform path and nearly matches its cost and error. On our
-    ShapeNet-like setting, it reaches IS-level mean estimation error,
-    although pure IS is slightly lower in the canonical run. On a
-    planted-outlier dataset, however, the experiments expose a
-    different limitation: at small
-    $n$, cost-based routing can still favor the uniform/brute-force side
-    even though estimation quality is poor, so the pilot does not
-    resolve the regime boundary as much as reveal it.
+    sampling. On our fixed low-CV text-like demonstrator, the rule
+    correctly collapses to the uniform path and nearly matches its cost
+    and error. On our fixed ShapeNet-like setting, it reaches IS-level
+    mean estimation error, although pure IS is slightly lower in the
+    canonical run. On a planted-outlier dataset, however, the
+    experiments expose a different limitation: cost-based routing can
+    still favor the uniform/brute-force side even when realized
+    estimation quality is poor, so the pilot does not resolve the
+    regime boundary as much as reveal it.
 \end{itemize}
 
 The rest of the paper proceeds in that order. Section~\ref{sec:background}
@@ -351,7 +358,7 @@ share the same two-stage structure and the same dependence on
 $\textsc{CrudeNN}$-style preprocessing, so the practical question
 studied in this paper applies to both.
 
-\section{Variance Analysis: \\ Uniform vs.\ Importance Sampling}
+\section{Variance Analysis: \ Uniform vs.\ Importance Sampling}
 \label{sec:theory}
 
 This section compares uniform sampling and importance sampling in a
@@ -1083,7 +1090,12 @@ of the codebase, all decision-quality experiments used a
 Bernstein-based cost-model oracle to define which branch
 (uniform/brute-force or IS) was preferable. This oracle was used only
 for evaluation; the adaptive estimator itself still made decisions using
-the pilot estimate $\widehat{\mathrm{CV}}_s$.
+the pilot estimate $\widehat{\mathrm{CV}}_s$. As a result, disagreement
+with the Bernstein oracle should be interpreted as end-to-end routing
+disagreement of the deployed one-statistic rule, not as pure pilot-CV
+estimation error: some mismatches are caused by pilot noise, while
+others are caused by the deliberate omission of $M(\gamma)$ and the
+brute-force cap from the runtime decision rule.
 
 The end-to-end comparison used three fixed datasets. The
 ShapeNet-like dataset used $n=8000$, $d=3$, and the calibrated
@@ -1225,8 +1237,11 @@ thresholds over-route to IS, leading to high false-positive rates. For
 example, at $\tau=0.5$ the total false-positive rate is $92.5\%$ and
 the borderline false-positive rate is $100\%$. As $\tau$ increases, the
 false-positive rate drops rapidly, but this comes at the cost of a
-rising false-negative rate. Near the default operating point, the
-closest grid value to $\sqrt{\log 2000}$ is $\tau=2.87$, where the
+rising false-negative rate. As a representative pooled reference for
+this mixed-$n$ benchmark, the closest grid value to $\sqrt{\log 2000}$
+is $\tau=2.87$; this is not exactly the deployed default, which uses
+the per-instance threshold $\tau=\sqrt{\log n}$. At this pooled
+reference point, the
 total false-positive rate is $2.0\%$ but the total false-negative rate
 is already $60.0\%$.
 
@@ -1299,9 +1314,12 @@ $42.76\%$ for fixed-budget uniform sampling. In branch-count terms,
 adaptive selected Uniform / IS / Uniform-Exact
 $= 5 / 8 / 7$. In query-equivalent cost, adaptive costs $5559$
 nearest-neighbor queries, compared with $3604$ for IS, because the
-exact fallback is triggered on $7/20$ trials. This is a useful reminder
-that in the small-$n$ regime, exact computation can remain competitive
-even when the asymptotic theory favors IS.
+exact fallback is triggered on $7/20$ trials. In this case the reason
+is not literally ``small $n$,'' but rather that the conservative
+Chebyshev-budgeted uniform branch can still hit the exact cap on a
+finite instance, making exact computation competitive in the
+query-equivalent accounting even though the asymptotic motivation for
+IS remains intact.
 
 The Outlier row should not be read as either simple adaptive success or
 simple adaptive failure. The Bernstein oracle labels the
@@ -1316,10 +1334,12 @@ higher query-equivalent cost, $2771$ compared with $170$ for adaptive.
 The result is a missing-mass failure of sample-based uniform estimation,
 not an oracle-routing failure.
 
-Overall, Table~\ref{tab:e2e} supports a nuanced conclusion. The
-adaptive rule behaves exactly as intended on low-CV data, is highly
-competitive on high-heterogeneity ShapeNet-like data, and cleanly exposes the
-limitations of pilot-based routing on extreme heavy-tail instances.
+Overall, Table~\ref{tab:e2e} supports a nuanced conclusion on these
+three fixed synthetic demonstrators. The adaptive rule behaves as
+intended on the low-CV row, is competitive with IS on the
+ShapeNet-like row despite conservative fallback behavior, and cleanly
+exposes the limitations of pilot-based routing on the extreme
+heavy-tail row.
 
 
 
@@ -1345,6 +1365,11 @@ coexist with poor performance on the subset where
 $\mathrm{CV}^2(\gamma) \approx \log n$. In other words, the pilot rule
 is best understood as a coarse routing heuristic that performs well on
 easy inputs, not as a sharp classifier of the exact break-even surface.
+Moreover, because our runtime rule intentionally uses only
+$\widehat{\mathrm{CV}}_s$ while the Bernstein oracle also depends on
+$M(\gamma)$ and the brute-force cap, the observed FP/FN rates conflate
+pilot noise with model mismatch between the deployed heuristic and the
+full cost model.
 This suggests that a stronger adaptive rule may need more than a single
 scalar statistic such as $\widehat{\mathrm{CV}}_s$. One natural next
 step is a two-statistic rule combining $\widehat{\mathrm{CV}}_s$ with a
@@ -1365,10 +1390,11 @@ open by prior work: when should a user pay for the IS machinery at all?
 The variance analysis makes the regime boundary explicit, the
 reproduction confirms the qualitative behavior of the Bakshi et al.\
 estimator, and the pilot experiments show that a small automatic pilot
-is often sufficient to recover the right branch in easy-to-moderate
-regimes. Just as importantly, the experiments make clear where this
-strategy fails: on borderline instances and on extreme heavy-tail data,
-the pilot does not eliminate uncertainty so much as expose it.
+often recovers a reasonable branch choice on easy-to-moderate
+synthetic instances. Just as importantly, the experiments make clear
+where this strategy fails: on borderline instances and on extreme
+heavy-tail data, the pilot does not eliminate uncertainty so much as
+expose it.
 
 
 \begin{thebibliography}{1}
